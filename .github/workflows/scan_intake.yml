@@ -10,8 +10,14 @@ permissions:
 
 jobs:
   harvest:
-    #if: contains(github.event.issue.labels.*.name, 'scan')
+    if: contains(github.event.issue.labels.*.name, 'scan')
     runs-on: ubuntu-latest
+    container:
+      image: jbarlow83/ocrmypdf-ubuntu:latest  # includes JBIG2 encoder
+    defaults:
+      run:
+        shell: bash
+
     steps:
       - uses: actions/checkout@v4
         with: { lfs: true }
@@ -21,10 +27,9 @@ jobs:
         run: |
           body=$(jq -r '.issue.body' <<< '${{ toJson(github.event) }}')
           echo "$body" > issue.md
-          # Extract URLs ending with .pdf (user-images.githubusercontent.com/*)
-          grep -Eo '(https?://[^[:space:])]+\.pdf)' issue.md | sort -u > urls.txt || true
+          # Extract URLs ending with .pdf (avoid capturing trailing ')')
+          grep -Eo '(https?://[^[:space:]()]+\.pdf)' issue.md | sort -u > urls.txt || true
           echo "Found URLs:"; cat urls.txt || true
-          # Derive naming from title
           title='${{ github.event.issue.title }}'
           term=$(jq -r '.issue.body' <<< '${{ toJson(github.event) }}' | sed -n 's/.*Term[:]* \([A-Za-z0-9-]*\).*/\1/p' | head -n1)
           course=$(jq -r '.issue.body' <<< '${{ toJson(github.event) }}' | sed -n 's/.*Course[:]* \([A-Za-z0-9_-]*\).*/\1/p' | head -n1)
@@ -33,10 +38,10 @@ jobs:
           echo "course=${course:-misc}" >> $GITHUB_OUTPUT
           echo "topic=${topic:-scan}" >> $GITHUB_OUTPUT
 
-      - name: Install deps
+      - name: Install extra tools in container
         run: |
-          sudo apt-get update
-          sudo apt-get install -y ocrmypdf tesseract-ocr poppler-utils python3 python3-pip jbig2enc
+          apt-get update
+          apt-get install -y --no-install-recommends poppler-utils jq curl git-lfs python3 python3-pip
           git lfs install
           pip3 install pypdf pyyaml
 
@@ -61,7 +66,6 @@ jobs:
             b="${base%.pdf}"
             pdftoppm -f 1 -l 1 -png "data/scans_ocr/$base" "data/thumbs/$b"
             mv "data/thumbs/${b}-1.png" "data/thumbs/${b}_p1.png" 2>/dev/null || true
-            # optional sidecar
             y="meta/${b}.yml"; [ -f "$y" ] || printf "title: %s\ncourse: %s\nterm: %s\ntags: []\n" "$b" "${{ steps.parse.outputs.course }}" "${{ steps.parse.outputs.term }}" > "$y"
           done
           python3 tools/index_notes.py
@@ -79,4 +83,3 @@ jobs:
             data/thumbs/**
             meta/**
             index.sqlite
-
