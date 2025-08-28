@@ -21,6 +21,7 @@ jobs:
         run: |
           body=$(jq -r '.issue.body' <<< '${{ toJson(github.event) }}')
           echo "$body" > issue.md
+          cat issue.md
           # Extract URLs ending with .pdf (user-images.githubusercontent.com/*)
           grep -Eo '(https?://[^\s)]+\.pdf)' issue.md | sort -u > urls.txt || true
           echo "Found URLs:"; cat urls.txt || true
