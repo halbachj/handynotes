@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   harvest:
-    if: contains(github.event.issue.labels.*.name, 'scan')
+    if: contains(github.event.issue.labels.*.name, 'Scan')
     runs-on: ubuntu-latest
     container:
       image: jbarlow83/ocrmypdf-ubuntu:latest  # includes JBIG2 encoder
