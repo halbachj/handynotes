@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   harvest:
-    if: contains(github.event.issue.labels.*.name, 'scan')
+    #if: contains(github.event.issue.labels.*.name, 'scan')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
