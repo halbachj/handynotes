@@ -2,26 +2,39 @@ name: Intake scans from issues
 
 on:
   issues:
-    types: [opened, edited]
+    types: [opened, edited, labeled, reopened]
 
 permissions:
   contents: write
   issues: read
+  pull-requests: write
 
 jobs:
   harvest:
-    #if: contains(github.event.issue.labels.*.name, 'Scan')
+    if: contains(github.event.issue.labels.*.name, 'scan') || (github.event.action == 'labeled' && github.event.label.name == 'scan')
     runs-on: ubuntu-latest
     container:
-      image: jbarlow83/ocrmypdf-ubuntu:latest  # includes JBIG2 encoder
+      image: jbarlow83/ocrmypdf-ubuntu:latest
     defaults:
       run:
         shell: bash
-
     steps:
-      - uses: actions/checkout@v4
-        with: { lfs: true }
+      - name: Install prerequisites for checkout
+        run: |
+          apt-get update
+          apt-get install -y --no-install-recommends git git-lfs ca-certificates tar
+          git lfs install
 
+      - uses: actions/checkout@v4
+        with:
+          lfs: true
+        
+      - name: Debug event payload
+        run: |
+          echo "action=${{ github.event.action }}"
+          echo "labels:"
+          jq -r '.issue.labels[].name' <<< '${{ toJson(github.event) }}' || true
+          
       - name: Parse issue for attachment URLs + metadata
         id: parse
         run: |
