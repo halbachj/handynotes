@@ -35,7 +35,7 @@ jobs:
       - name: Debug event payload
         run: |
           echo "action=${{ github.event.action }}"
-          echo "event=${{ toJson(github.event) }}"
+          echo "event=${{ github.event }}"
           echo "labels:"
           jq -r '.issue.labels[].name' <<< '${{ toJson(github.event) }}' || true
           
