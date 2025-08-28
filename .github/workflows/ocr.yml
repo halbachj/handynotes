@@ -1,0 +1,88 @@
+name: OCR and Index Scans
+
+on:
+  push:
+    paths:
+      - 'data/scans_raw/**/*.pdf'
+      - 'meta/**/*.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  ocr:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout (with LFS)
+        uses: actions/checkout@v4
+        with:
+          lfs: true
+
+      - name: Set up Git LFS
+        run: |
+          git lfs install
+          git lfs fetch
+          git lfs checkout
+
+      - name: Install system deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ocrmypdf tesseract-ocr poppler-utils python3 python3-pip
+
+      - name: Install Python deps
+        run: |
+          pip3 install --upgrade pypdf pyyaml
+
+      - name: OCR raw scans -> scans_ocr
+        shell: bash
+        run: |
+          mkdir -p data/scans_ocr
+          shopt -s nullglob
+          for f in data/scans_raw/**/*.pdf data/scans_raw/*.pdf; do
+            [ -e "$f" ] || continue
+            base="$(basename "$f")"
+            out="data/scans_ocr/$base"
+            if [ -f "$out" ] && [ "$out" -nt "$f" ]; then
+              echo "Up-to-date: $base"
+              continue
+            fi
+            ocrmypdf --rotate-pages --deskew --clean --optimize 3 \
+                     --language eng --output-type pdf "$f" "$out"
+            echo "OCR'd: $base"
+          done
+
+      - name: Generate thumbnails (first page)
+        shell: bash
+        run: |
+          mkdir -p data/thumbs
+          shopt -s nullglob
+          for f in data/scans_ocr/*.pdf; do
+            b="$(basename "${f%.pdf}")"
+            out="data/thumbs/${b}_p1.png"
+            if [ -f "$out" ] && [ "$out" -nt "$f" ]; then
+              echo "Thumb fresh: $b"
+              continue
+            fi
+            pdftoppm -f 1 -l 1 -png "$f" "data/thumbs/$b"
+            mv "data/thumbs/${b}-1.png" "$out" 2>/dev/null || true
+            echo "Thumb: $out"
+          done
+
+      - name: Build SQLite index
+        run: |
+          python3 tools/index_notes.py
+
+      - name: Create PR with generated files
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "chore(ocr): update OCR, thumbs, and index"
+          branch: ci/ocr-update
+          title: "OCR: update scanned notes and index"
+          body: "Automated OCR, thumbnails, and index.sqlite update."
+          add-paths: |
+            data/scans_ocr/**
+            data/thumbs/**
+            index.sqlite
+

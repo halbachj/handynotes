@@ -1,0 +1,21 @@
+name: New Scan
+description: Upload scanned pages (drag & drop), we’ll OCR and index them.
+title: "Scan: <course> <topic> <date>"
+labels: [scan]
+body:
+  - type: markdown
+    attributes:
+      value: "Attach PDFs by dragging them below. Optionally fill metadata."
+  - type: input
+    id: term
+    attributes: { label: Term, placeholder: "2025-S1" }
+  - type: input
+    id: course
+    attributes: { label: Course, placeholder: "Circuits" }
+  - type: input
+    id: topic
+    attributes: { label: Topic, placeholder: "OpAmp" }
+  - type: textarea
+    id: notes
+    attributes: { label: Notes/Tags, placeholder: "#opamp #bode" }
+

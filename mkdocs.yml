@@ -1,0 +1,7 @@
+site_name: College Notes
+theme:
+  name: material
+docs_dir: notes
+nav:
+  - Home: index.md
+

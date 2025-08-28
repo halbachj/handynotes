@@ -1,0 +1,46 @@
+name: Build & Deploy Notes Site
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'notes/**'
+      - 'meta/**'
+      - 'data/thumbs/**'
+      - 'mkdocs.yml'
+  workflow_dispatch: {}
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: true }
+
+      - name: Install MkDocs
+        run: |
+          pip3 install mkdocs mkdocs-material
+
+      - name: Build site
+        run: mkdocs build --strict
+
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
+

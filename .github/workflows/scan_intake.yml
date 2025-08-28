@@ -1,0 +1,82 @@
+name: Intake scans from issues
+
+on:
+  issues:
+    types: [opened, edited]
+
+permissions:
+  contents: write
+  issues: read
+
+jobs:
+  harvest:
+    if: contains(github.event.issue.labels.*.name, 'scan')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { lfs: true }
+
+      - name: Parse issue for attachment URLs + metadata
+        id: parse
+        run: |
+          body=$(jq -r '.issue.body' <<< '${{ toJson(github.event) }}')
+          echo "$body" > issue.md
+          # Extract URLs ending with .pdf (user-images.githubusercontent.com/*)
+          grep -Eo '(https?://[^\s)]+\.pdf)' issue.md | sort -u > urls.txt || true
+          echo "Found URLs:"; cat urls.txt || true
+          # Derive naming from title
+          title='${{ github.event.issue.title }}'
+          term=$(jq -r '.issue.body' <<< '${{ toJson(github.event) }}' | sed -n 's/.*Term[:]* \([A-Za-z0-9-]*\).*/\1/p' | head -n1)
+          course=$(jq -r '.issue.body' <<< '${{ toJson(github.event) }}' | sed -n 's/.*Course[:]* \([A-Za-z0-9_-]*\).*/\1/p' | head -n1)
+          topic=$(jq -r '.issue.body' <<< '${{ toJson(github.event) }}' | sed -n 's/.*Topic[:]* \([A-Za-z0-9_-]*\).*/\1/p' | head -n1)
+          echo "term=${term:-unknown}" >> $GITHUB_OUTPUT
+          echo "course=${course:-misc}" >> $GITHUB_OUTPUT
+          echo "topic=${topic:-scan}" >> $GITHUB_OUTPUT
+
+      - name: Install deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ocrmypdf tesseract-ocr poppler-utils python3 python3-pip
+          git lfs install
+          pip3 install pypdf pyyaml
+
+      - name: Download attachments into raw inbox
+        run: |
+          mkdir -p data/scans_raw data/scans_ocr data/thumbs meta
+          i=0
+          while read -r u; do
+            [ -n "$u" ] || continue
+            i=$((i+1))
+            out="data/scans_raw/${{ steps.parse.outputs.term }}_${{ steps.parse.outputs.course }}_${{ steps.parse.outputs.topic }}_${i}.pdf"
+            curl -L "$u" -o "$out"
+            echo "Downloaded -> $out"
+          done < urls.txt || true
+
+      - name: OCR + thumbnails + index
+        run: |
+          for f in data/scans_raw/*.pdf; do
+            [ -e "$f" ] || continue
+            base=$(basename "$f")
+            ocrmypdf --rotate-pages --deskew --clean --optimize 3 --language eng "$f" "data/scans_ocr/$base"
+            b="${base%.pdf}"
+            pdftoppm -f 1 -l 1 -png "data/scans_ocr/$base" "data/thumbs/$b"
+            mv "data/thumbs/${b}-1.png" "data/thumbs/${b}_p1.png" 2>/dev/null || true
+            # optional sidecar
+            y="meta/${b}.yml"; [ -f "$y" ] || printf "title: %s\ncourse: %s\nterm: %s\ntags: []\n" "$b" "${{ steps.parse.outputs.course }}" "${{ steps.parse.outputs.term }}" > "$y"
+          done
+          python3 tools/index_notes.py
+
+      - name: Commit changes to a PR
+        uses: peter-evans/create-pull-request@v6
+        with:
+          commit-message: "intake(scan): OCR & index from issue #${{ github.event.issue.number }}"
+          branch: ci/scan-${{ github.event.issue.number }}
+          title: "Scan intake for #${{ github.event.issue.number }}"
+          body: "Generated from issue attachments."
+          add-paths: |
+            data/scans_raw/**
+            data/scans_ocr/**
+            data/thumbs/**
+            meta/**
+            index.sqlite
+
