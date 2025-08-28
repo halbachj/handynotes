@@ -48,13 +48,6 @@ jobs:
           echo "course=${course:-misc}" >> $GITHUB_OUTPUT
           echo "topic=${topic:-scan}" >> $GITHUB_OUTPUT
 
-      - name: Install extra tools in container
-        run: |
-          apt-get update
-          apt-get install -y --no-install-recommends poppler-utils jq curl git-lfs python3 python3-pip
-          git lfs install
-          pip3 install pypdf pyyaml
-
       - name: Download attachments into raw inbox
         run: |
           mkdir -p data/scans_raw data/scans_ocr data/thumbs meta
