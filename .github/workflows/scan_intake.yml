@@ -27,7 +27,7 @@ jobs:
             jq curl poppler-utils python3 python3-pip python3-venv
           git lfs install
           python3 -m venv .venv
-          source .ven/bin/activate
+          source .venv/bin/activate
           pip3 install pypdf pyyaml
 
       - uses: actions/checkout@v4
