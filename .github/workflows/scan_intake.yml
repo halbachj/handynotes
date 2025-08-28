@@ -32,13 +32,6 @@ jobs:
         with:
           lfs: true
           
-      - name: Debug event payload
-        run: |
-          echo "action=${{ github.event.action }}"
-          echo "event=${{ github.event }}"
-          echo "labels:"
-          jq -r '.issue.labels[].name' <<< '${{ toJson(github.event) }}' || true
-          
       - name: Parse issue for attachment URLs + metadata
         id: parse
         run: |
