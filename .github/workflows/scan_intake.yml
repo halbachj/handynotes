@@ -73,6 +73,7 @@ jobs:
             mv "data/thumbs/${b}-1.png" "data/thumbs/${b}_p1.png" 2>/dev/null || true
             y="meta/${b}.yml"; [ -f "$y" ] || printf "title: %s\ncourse: %s\nterm: %s\ntags: []\n" "$b" "${{ steps.parse.outputs.course }}" "${{ steps.parse.outputs.term }}" > "$y"
           done
+          source .venv/bin/activate
           python3 tools/index_notes.py
 
       - name: Commit changes to a PR
